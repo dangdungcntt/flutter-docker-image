@@ -1,6 +1,11 @@
 stages:
   - build
 
+default:
+  image: docker:29.6.1-cli
+  before_script:
+    - apk add --no-cache bash python3
+
 variables:
   IMAGE_NAME: "$CI_REGISTRY_IMAGE/flutter-android"
 
@@ -12,6 +17,7 @@ build-android-image:
   interruptible: true
   script:
     - |
+      bash <<'BASH'
       set -euo pipefail
 
       read_version() {
@@ -61,3 +67,4 @@ build-android-image:
         "${IMAGE_TAGS[@]}" \
         --push \
         .
+      BASH
