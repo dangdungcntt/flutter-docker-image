@@ -135,7 +135,7 @@ SHELL ["/bin/bash", "-euxo", "pipefail", "-c"]
 
 # BuildKit provides TARGETARCH for every requested target platform. Debian uses
 # the same architecture names in its OpenJDK installation paths.
-ARG TARGETARCH=amd64
+ARG TARGETARCH
 ENV ANDROID_HOME="$SDK_ROOT/android-sdk" \
     JAVA_HOME="/usr/lib/jvm/java-17-openjdk-${TARGETARCH}"
 ENV PATH="$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$HOME/.local/bin"
