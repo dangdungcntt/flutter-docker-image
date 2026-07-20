@@ -133,11 +133,11 @@ FROM fastlane AS android
 
 SHELL ["/bin/bash", "-euxo", "pipefail", "-c"]
 
-# TODO: Get JAVA_HOME dinamically from a JDK binary
-# TODO: Use `dirname $(dirname $(readlink -f $(which javac)))` after the following issue is fixed
-# TODO: https://github.com/moby/moby/issues/29110
+# BuildKit provides TARGETARCH for every requested target platform. Debian uses
+# the same architecture names in its OpenJDK installation paths.
+ARG TARGETARCH=amd64
 ENV ANDROID_HOME="$SDK_ROOT/android-sdk" \
-    JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+    JAVA_HOME="/usr/lib/jvm/java-17-openjdk-${TARGETARCH}"
 ENV PATH="$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$HOME/.local/bin"
 
 # renovate: suite=bookworm depName=openjdk-17-jdk-headless

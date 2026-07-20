@@ -1,0 +1,63 @@
+stages:
+  - build
+
+variables:
+  IMAGE_NAME: "$CI_REGISTRY_IMAGE/flutter-android"
+
+build-android-image:
+  stage: build
+  tags:
+    - macos
+  resource_group: flutter-android-image
+  interruptible: true
+  script:
+    - |
+      set -euo pipefail
+
+      read_version() {
+        python3 -c "import json; data=json.load(open('config/version.json')); print($1)"
+      }
+
+      FLUTTER_VERSION="$(read_version "data['flutter']['version']")"
+      FASTLANE_VERSION="$(read_version "data['fastlane']['version']")"
+      ANDROID_BUILD_TOOLS_VERSION="$(read_version "data['android']['buildTools']['version']")"
+      ANDROID_PLATFORM_VERSIONS="$(read_version "' '.join(str(item['version']) for item in data['android']['platforms'])")"
+      ANDROID_NDK_VERSION="$(read_version "data['android']['ndk']['version']")"
+      CMAKE_VERSION="$(read_version "data['android']['cmake']['version']")"
+
+      echo "$CI_REGISTRY_PASSWORD" | docker login \
+        --username "$CI_REGISTRY_USER" \
+        --password-stdin \
+        "$CI_REGISTRY"
+
+      BUILDER_NAME="flutter-multiarch-${CI_PIPELINE_ID}-${CI_JOB_ID}"
+      docker buildx create \
+        --driver docker-container \
+        --name "$BUILDER_NAME" \
+        --use
+      trap 'docker buildx rm "$BUILDER_NAME" >/dev/null 2>&1 || true' EXIT
+      docker buildx inspect --bootstrap
+
+      IMAGE_TAGS=(
+        --tag "$IMAGE_NAME:$CI_COMMIT_SHORT_SHA"
+        --tag "$IMAGE_NAME:$CI_COMMIT_REF_SLUG"
+      )
+      if [[ "${CI_COMMIT_BRANCH:-}" == "$CI_DEFAULT_BRANCH" ]]; then
+        IMAGE_TAGS+=(--tag "$IMAGE_NAME:latest")
+      fi
+
+      docker buildx build \
+        --file android.Dockerfile \
+        --target android \
+        --platform linux/arm64/v8,linux/amd64 \
+        --build-arg "flutter_version=$FLUTTER_VERSION" \
+        --build-arg "fastlane_version=$FASTLANE_VERSION" \
+        --build-arg "android_build_tools_version=$ANDROID_BUILD_TOOLS_VERSION" \
+        --build-arg "android_platform_versions=$ANDROID_PLATFORM_VERSIONS" \
+        --build-arg "android_ndk_version=$ANDROID_NDK_VERSION" \
+        --build-arg "cmake_version=$CMAKE_VERSION" \
+        --cache-from "type=registry,ref=$IMAGE_NAME:buildcache" \
+        --cache-to "type=registry,ref=$IMAGE_NAME:buildcache,mode=max" \
+        "${IMAGE_TAGS[@]}" \
+        --push \
+        .
