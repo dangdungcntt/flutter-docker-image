@@ -37,10 +37,14 @@ jobs:
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
 
       - name: Login to Docker Hub
+        if: env.DOCKER_HUB_USERNAME != '' && env.DOCKER_HUB_TOKEN != ''
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        env:
+          DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
+          DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
         with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+          username: ${{ env.DOCKER_HUB_USERNAME }}
+          password: ${{ env.DOCKER_HUB_TOKEN }}
 
       - name: Setup mise tools
         uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
