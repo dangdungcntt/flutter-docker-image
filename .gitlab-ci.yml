@@ -43,11 +43,6 @@ build-android-image:
       ANDROID_NDK_VERSION="$(read_version "data['android']['ndk']['version']")"
       CMAKE_VERSION="$(read_version "data['android']['cmake']['version']")"
 
-      echo "$CI_REGISTRY_PASSWORD" | docker login \
-        --username "$CI_REGISTRY_USER" \
-        --password-stdin \
-        "$CI_REGISTRY"
-
       BUILDER_NAME="flutter-multiarch-${CI_PIPELINE_ID}-${CI_JOB_ID}"
       docker buildx create \
         --driver docker-container \
@@ -64,19 +59,42 @@ build-android-image:
         IMAGE_TAGS+=(--tag "$IMAGE_NAME:latest")
       fi
 
-      docker buildx build \
-        --file android.Dockerfile \
-        --target android \
-        --platform linux/arm64/v8,linux/amd64 \
-        --build-arg "flutter_version=$FLUTTER_VERSION" \
-        --build-arg "fastlane_version=$FASTLANE_VERSION" \
-        --build-arg "android_build_tools_version=$ANDROID_BUILD_TOOLS_VERSION" \
-        --build-arg "android_platform_versions=$ANDROID_PLATFORM_VERSIONS" \
-        --build-arg "android_ndk_version=$ANDROID_NDK_VERSION" \
-        --build-arg "cmake_version=$CMAKE_VERSION" \
-        --cache-from "type=registry,ref=$IMAGE_NAME:buildcache" \
-        --cache-to "type=registry,ref=$IMAGE_NAME:buildcache,mode=max" \
+      BUILD_ARGUMENTS=(
+        --build-arg "flutter_version=$FLUTTER_VERSION"
+        --build-arg "fastlane_version=$FASTLANE_VERSION"
+        --build-arg "android_build_tools_version=$ANDROID_BUILD_TOOLS_VERSION"
+        --build-arg "android_platform_versions=$ANDROID_PLATFORM_VERSIONS"
+        --build-arg "android_ndk_version=$ANDROID_NDK_VERSION"
+        --build-arg "cmake_version=$CMAKE_VERSION"
+      )
+
+      PLATFORM_IMAGES=()
+      for platform in linux/amd64 linux/arm64/v8; do
+        architecture="${platform#linux/}"
+        architecture="${architecture%%/*}"
+        platform_image="$IMAGE_NAME:${CI_COMMIT_SHORT_SHA}-${architecture}"
+
+        # Push one architecture at a time so large SDK layers receive the
+        # runner's full upload bandwidth. Inline cache avoids uploading a
+        # second copy of the build layers to a separate cache manifest.
+        echo "$CI_REGISTRY_PASSWORD" | docker login \
+          --username "$CI_REGISTRY_USER" \
+          --password-stdin \
+          "$CI_REGISTRY"
+        docker buildx build \
+          --file android.Dockerfile \
+          --target android \
+          --platform "$platform" \
+          "${BUILD_ARGUMENTS[@]}" \
+          --cache-from "type=registry,ref=$IMAGE_NAME:$CI_COMMIT_REF_SLUG" \
+          --cache-to type=inline \
+          --tag "$platform_image" \
+          --push \
+          .
+        PLATFORM_IMAGES+=("$platform_image")
+      done
+
+      docker buildx imagetools create \
         "${IMAGE_TAGS[@]}" \
-        --push \
-        .
+        "${PLATFORM_IMAGES[@]}"
       BASH
