@@ -3,9 +3,6 @@ stages:
 
 default:
   image: docker:29.6.1-cli
-  services:
-    - name: docker:29.6.1-dind
-      alias: docker
   before_script:
     - apk add --no-cache bash python3
     - |
@@ -21,8 +18,7 @@ default:
       done
 
 variables:
-  DOCKER_HOST: "tcp://docker:2375"
-  DOCKER_TLS_CERTDIR: ""
+  DOCKER_HOST: "unix:///var/run/docker.sock"
   IMAGE_NAME: "$CI_REGISTRY_IMAGE/flutter-android"
 
 build-android-image:
