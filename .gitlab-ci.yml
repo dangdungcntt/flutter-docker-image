@@ -3,10 +3,26 @@ stages:
 
 default:
   image: docker:29.6.1-cli
+  services:
+    - name: docker:29.6.1-dind
+      alias: docker
   before_script:
     - apk add --no-cache bash python3
+    - |
+      for attempt in $(seq 1 30); do
+        if docker info >/dev/null 2>&1; then
+          break
+        fi
+        if [ "$attempt" -eq 30 ]; then
+          echo "Docker daemon did not become ready" >&2
+          exit 1
+        fi
+        sleep 1
+      done
 
 variables:
+  DOCKER_HOST: "tcp://docker:2375"
+  DOCKER_TLS_CERTDIR: ""
   IMAGE_NAME: "$CI_REGISTRY_IMAGE/flutter-android"
 
 build-android-image:
